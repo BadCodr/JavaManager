@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-
+using Microsoft.Win32;
 namespace JavaManager
 {
     public partial class Form1 : Form
@@ -19,44 +19,64 @@ namespace JavaManager
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            textBox1.Text = isJavaInstalled().ToString();
-
+            Main();
         }
 
-        private bool isJavaInstalled()
+        private void Main()
+        {
+            if(isJavaInstalled(out bool is64Bit))
+                textBox1.Text = JavaInstallDirectory(is64Bit);
+        }
+
+        private bool isJavaInstalled(out bool is64Bit)
+        {
+            
+            RegistryKey javaRegistryKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64).OpenSubKey(@"SOFTWARE\JavaSoft\Java Runtime Environment");
+
+            if (javaRegistryKey != null)
+            {
+                is64Bit = true;
+                return true;
+            }
+            
+            else
+            {
+                javaRegistryKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64).OpenSubKey(@"SOFTWARE\JavaSoft\Java Runtime Environment");
+                if (javaRegistryKey != null)
+                {
+                    is64Bit = false;
+                    return true;
+                }
+
+            }
+
+            is64Bit = Environment.Is64BitOperatingSystem;
+            return false;
+        }
+
+
+
+        public string JavaInstallDirectory(bool is64Bit)
         {
 
-            if (Environment.GetEnvironmentVariable("JAVA_HOME", EnvironmentVariableTarget.Machine) != null)
-                return true;
-            else if (Environment.GetEnvironmentVariable("JDK_HOME", EnvironmentVariableTarget.Machine) != null)
-                return true;
-            else if (System.IO.Directory.Exists(@"C:\ProgramData\Oracle\Java\javapath"))
-            {
-                if(System.IO.File.Exists(@"C:\ProgramData\Oracle\Java\javapath\java.jar")&&System.IO.File.Exists(@"C:\ProgramData\Oracle\Java\javapath\javaw.jar"));
-                    return true;
-            }
-            else if (System.IO.Directory.Exists(@"C:\Program Files\Java"))
-                return true;
 
-            return false;
+            RegistryKey javaRegistryKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, (RegistryView)(is64Bit ? 256 : 512)).OpenSubKey("SOFTWARE\\JavaSoft\\Java Runtime Environment");
+            string currentVerion = javaRegistryKey.GetValue("CurrentVersion").ToString();
 
+            javaRegistryKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, (RegistryView)(is64Bit ? 256 : 512)).OpenSubKey("SOFTWARE\\JavaSoft\\Java Runtime Environment\\"+currentVerion);
+            string installDirectory = javaRegistryKey.GetValue("JavaHome").ToString();
+
+            return installDirectory;
         }
-
 
         private void button1_Click(object sender, EventArgs e)
         {
-            textBox1.Text = isJavaInstalled().ToString();
+            Main();
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
-            if(System.IO.Directory.Exists(@"C:\Program Files\Java"))
-            {
-                System.IO.DirectoryInfo directoryInfo = new System.IO.DirectoryInfo(@"C:\Program Files\Java");
-                var directory = directoryInfo.GetDirectories();
-                
-                textBox1.Text = directory[directory.Length-1].Name;
-            }
+
         }
     }
 }
