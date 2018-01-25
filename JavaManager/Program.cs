@@ -12,11 +12,15 @@ namespace JavaManager
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            bool debug = false;
+            if (args.Length > 0)
+                if (bool.TryParse(args[0], out debug));
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            new JavaInstallerManager().JavaManagerInit(debug);
         }
     }
 }
