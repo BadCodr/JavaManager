@@ -16,6 +16,7 @@ namespace JavaManager
     public partial class Form1 : Form
     {
         private string latestVersion;
+        WebBrowser webBrowser;
 
         public Form1()
         {
@@ -29,17 +30,18 @@ namespace JavaManager
             Main();
         }
         
-
         private void PhaseOneWebComplete(object sender, WebBrowserDocumentCompletedEventArgs e)
         {
-            webBrowser1.DocumentCompleted -= new WebBrowserDocumentCompletedEventHandler(PhaseOneWebComplete);
+            webBrowser.DocumentCompleted -= new WebBrowserDocumentCompletedEventHandler(PhaseOneWebComplete);
             string s = "";
-            foreach (HtmlElement htmlElement in webBrowser1.Document.Body.All)
+
+            foreach (HtmlElement htmlElement in webBrowser.Document.Body.All)
             {
                 if (htmlElement.GetAttribute("className") == "sub")
                     s = htmlElement.InnerText;
 
             }
+
             s = s.Split('(')[0].Replace(" Update ", "u").Split(' ')[2];
 
             latestVersion = s;
@@ -47,28 +49,45 @@ namespace JavaManager
 
         private void PhaseTwoWebComplete(object sender, WebBrowserDocumentCompletedEventArgs e)
         {
-            webBrowser1.DocumentCompleted -= new WebBrowserDocumentCompletedEventHandler(PhaseTwoWebComplete);
-            string javaDownload="";
-            foreach (HtmlElement htmlElement in webBrowser1.Document.Links)
+            webBrowser.DocumentCompleted -= new WebBrowserDocumentCompletedEventHandler(PhaseTwoWebComplete);
+            List<string> javaDownload = new List<string>();
+
+            foreach (HtmlElement htmlElement in webBrowser.Document.Links)
             {
                 string s = htmlElement.GetAttribute("HREF").ToString();
                 if (s.Contains("AutoDL"))
                 {
-                    javaDownload = s;
-                    break;
+                    if (!javaDownload.Contains(s))
+                        javaDownload.Add(s);
                 }
             }
+            webBrowser.Dispose();
             System.Net.WebClient webClient = new System.Net.WebClient();
-            webClient.DownloadFile(javaDownload, System.IO.Path.GetTempPath() + latestVersion+".exe");
+
+            if (Environment.Is64BitOperatingSystem)
+                webClient.DownloadFile(javaDownload[2], System.IO.Path.GetTempPath() + latestVersion + ".exe");
+            else
+                webClient.DownloadFile(javaDownload[1], System.IO.Path.GetTempPath() + latestVersion + ".exe");
 
             while (webClient.IsBusy)
-                ;
+            {
+                Application.DoEvents();
+            }
             InstallJava(System.IO.Path.GetTempPath() + latestVersion + ".exe");
         }
 
         private void InstallJava(string file)
         {
-            Process.Start(file, "/s");
+            try
+            {
+                var process = Process.Start(file, "/s");
+                Application.Exit();
+            }
+            catch (Win32Exception)
+            {
+                throw;
+            }
+            
         }
 
         private void Main()
@@ -76,20 +95,17 @@ namespace JavaManager
             bool is64Bit;
             string version;
 
-
             if (isJavaInstalled(out is64Bit))
             {
                 JavaInstallDirectory(is64Bit, out version);
                 if (version == null)
-                    textBox1.Text = "something is wrong...";//                    WebBrowserStartPhaseTwo();
+                    WebBrowserStartPhaseTwo();
                 else if (version != latestVersion)
                     WebBrowserStartPhaseTwo();
-            } 
-            else
-            {
-                WebBrowserStartPhaseTwo();
-
             }
+
+            else
+                WebBrowserStartPhaseTwo();
         }
 
         private bool isJavaInstalled(out bool is64Bit)
@@ -112,6 +128,8 @@ namespace JavaManager
                     return true;
                 }
             }
+
+            javaRegistryKey.Close();
 
             is64Bit = Environment.Is64BitOperatingSystem;
             return false;
@@ -137,12 +155,11 @@ namespace JavaManager
 
         private void WebBrowserInit()
         {
-            string processName = Process.GetCurrentProcess().ProcessName + ".exe";
+            webBrowser = new WebBrowser();
             RegistryKey Regkey = null;
 
-
+            string processName = Process.GetCurrentProcess().ProcessName + ".exe";
             Regkey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\\Microsoft\\Internet Explorer\\Main\\FeatureControl\\FEATURE_BROWSER_EMULATION", true);
-
             string processID = Convert.ToString(Regkey.GetValue(processName));
             
             if(processID=="8000")
@@ -152,54 +169,28 @@ namespace JavaManager
             }
 
             Regkey.SetValue(processName, unchecked((int)0x1F40), RegistryValueKind.DWord);
-
             Regkey.Close();
-
         }
+
 
         private void WebBrowserStartPhaseOne()
         {
-            webBrowser1.DocumentCompleted += new WebBrowserDocumentCompletedEventHandler(PhaseOneWebComplete);
-            webBrowser1.ScriptErrorsSuppressed = true;
+            webBrowser.DocumentCompleted += new WebBrowserDocumentCompletedEventHandler(PhaseOneWebComplete);
+            webBrowser.ScriptErrorsSuppressed = true;
 
-            webBrowser1.Navigate(new Uri("https://java.com/inc/BrowserRedirect1.jsp?locale=en"));
-   /*         while (webBrowser1.ReadyState != WebBrowserReadyState.Complete)
+            webBrowser.Navigate(new Uri("https://java.com/inc/BrowserRedirect1.jsp?locale=en"));
+            while (webBrowser.ReadyState != WebBrowserReadyState.Complete)
             {
                 Application.DoEvents();
-                System.Threading.Thread.Sleep(100);
-            } */
-
+            }
         }
 
         private void WebBrowserStartPhaseTwo()
         {
-            webBrowser1.DocumentCompleted += new WebBrowserDocumentCompletedEventHandler(PhaseTwoWebComplete);
-            webBrowser1.ScriptErrorsSuppressed = true;
+            webBrowser.DocumentCompleted += new WebBrowserDocumentCompletedEventHandler(PhaseTwoWebComplete);
+            webBrowser.ScriptErrorsSuppressed = true;
 
-            webBrowser1.Navigate(new Uri("https://java.com/inc/BrowserRedirect1.jsp?locale=en"));
-            // download latest version XPATH?
-            
-            
-        }
-
-        private void button1_Click(object sender, EventArgs e)
-        {
-            Main();
-        }
-
-        private void button2_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void textBox1_TextChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        private void webBrowser1_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
-        {
-            
+            webBrowser.Navigate(new Uri("https://java.com/en/download/manual.jsp"));
         }
     }
 }
