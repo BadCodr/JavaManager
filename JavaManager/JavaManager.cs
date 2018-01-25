@@ -171,7 +171,6 @@ namespace JavaManager
                 }
             }
             Console.WriteLine("Obtained Download Link...");
-            webBrowser.Dispose();
             System.Net.WebClient webClient = new System.Net.WebClient();
 
             Console.WriteLine("Downloading Java Version {0} for {1} bit system", latestVersion, Environment.Is64BitOperatingSystem ? "64" : "32");
@@ -183,10 +182,8 @@ namespace JavaManager
                 webClient.DownloadFile(javaDownload[1], System.IO.Path.GetTempPath() + latestVersion + ".exe");
 
             while (webClient.IsBusy)
-            {
-                
                 Application.DoEvents();
-            }
+
             Console.WriteLine("Downoaded latest Java Version...");
             Console.WriteLine("Proceeding To Install Java Version {0}", latestVersion);
 
@@ -200,7 +197,7 @@ namespace JavaManager
                 var process = Process.Start(file, "/s");
                 Console.WriteLine("Installing Java...");
                 Console.WriteLine("You May Now Close This Window");
-                Console.ReadLine();
+                Console.ReadKey();
             }
             catch (Win32Exception)
             {
