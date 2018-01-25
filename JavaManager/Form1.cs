@@ -15,29 +15,60 @@ namespace JavaManager
 {
     public partial class Form1 : Form
     {
+        private string latestVersion;
+
         public Form1()
         {
             InitializeComponent();
-            
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
             WebBrowserInit();
+            WebBrowserStartPhaseOne();
             Main();
-            
-            webBrowser1.DocumentCompleted += new WebBrowserDocumentCompletedEventHandler(DocoCompleted);
-            webBrowser1.ScriptErrorsSuppressed = true;
-
-            webBrowser1.Navigate(new Uri("https://java.com/inc/BrowserRedirect1.jsp?locale=en"));
         }
         
 
-        private void DocoCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
+        private void PhaseOneWebComplete(object sender, WebBrowserDocumentCompletedEventArgs e)
         {
-            textBox1.Text = webBrowser1.Url.ToString();
+            webBrowser1.DocumentCompleted -= new WebBrowserDocumentCompletedEventHandler(PhaseOneWebComplete);
+            string s = "";
+            foreach (HtmlElement htmlElement in webBrowser1.Document.Body.All)
+            {
+                if (htmlElement.GetAttribute("className") == "sub")
+                    s = htmlElement.InnerText;
 
+            }
+            s = s.Split('(')[0].Replace(" Update ", "u").Split(' ')[2];
 
+            latestVersion = s;
+        }
+
+        private void PhaseTwoWebComplete(object sender, WebBrowserDocumentCompletedEventArgs e)
+        {
+            webBrowser1.DocumentCompleted -= new WebBrowserDocumentCompletedEventHandler(PhaseTwoWebComplete);
+            string javaDownload="";
+            foreach (HtmlElement htmlElement in webBrowser1.Document.Links)
+            {
+                string s = htmlElement.GetAttribute("HREF").ToString();
+                if (s.Contains("AutoDL"))
+                {
+                    javaDownload = s;
+                    break;
+                }
+            }
+            System.Net.WebClient webClient = new System.Net.WebClient();
+            webClient.DownloadFile(javaDownload, System.IO.Path.GetTempPath() + latestVersion+".exe");
+
+            while (webClient.IsBusy)
+                ;
+            InstallJava(System.IO.Path.GetTempPath() + latestVersion + ".exe");
+        }
+
+        private void InstallJava(string file)
+        {
+            Process.Start(file, "/s");
         }
 
         private void Main()
@@ -47,8 +78,18 @@ namespace JavaManager
 
 
             if (isJavaInstalled(out is64Bit))
-                textBox1.Text = JavaInstallDirectory(is64Bit, out version);
-            
+            {
+                JavaInstallDirectory(is64Bit, out version);
+                if (version == null)
+                    textBox1.Text = "something is wrong...";//                    WebBrowserStartPhaseTwo();
+                else if (version != latestVersion)
+                    WebBrowserStartPhaseTwo();
+            } 
+            else
+            {
+                WebBrowserStartPhaseTwo();
+
+            }
         }
 
         private bool isJavaInstalled(out bool is64Bit)
@@ -82,11 +123,15 @@ namespace JavaManager
         {
             RegistryKey javaRegistryKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, (RegistryView)(is64Bit ? 256 : 512)).OpenSubKey("SOFTWARE\\JavaSoft\\Java Runtime Environment");
             string currentVerion = javaRegistryKey.GetValue("CurrentVersion").ToString();
-            version = currentVerion;
-
+            
             javaRegistryKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, (RegistryView)(is64Bit ? 256 : 512)).OpenSubKey("SOFTWARE\\JavaSoft\\Java Runtime Environment\\"+currentVerion);
             string installDirectory = javaRegistryKey.GetValue("JavaHome").ToString();
 
+            var temp = installDirectory.Split("\\".ToCharArray());
+            var temp2 = temp[temp.Length - 1].Remove(0,5).Replace('_','u');
+            temp2 = temp2.Remove(temp2.IndexOf('.'), 2);
+
+            version = temp2;
             return installDirectory;
         }
 
@@ -112,8 +157,30 @@ namespace JavaManager
 
         }
 
+        private void WebBrowserStartPhaseOne()
+        {
+            webBrowser1.DocumentCompleted += new WebBrowserDocumentCompletedEventHandler(PhaseOneWebComplete);
+            webBrowser1.ScriptErrorsSuppressed = true;
 
+            webBrowser1.Navigate(new Uri("https://java.com/inc/BrowserRedirect1.jsp?locale=en"));
+   /*         while (webBrowser1.ReadyState != WebBrowserReadyState.Complete)
+            {
+                Application.DoEvents();
+                System.Threading.Thread.Sleep(100);
+            } */
 
+        }
+
+        private void WebBrowserStartPhaseTwo()
+        {
+            webBrowser1.DocumentCompleted += new WebBrowserDocumentCompletedEventHandler(PhaseTwoWebComplete);
+            webBrowser1.ScriptErrorsSuppressed = true;
+
+            webBrowser1.Navigate(new Uri("https://java.com/inc/BrowserRedirect1.jsp?locale=en"));
+            // download latest version XPATH?
+            
+            
+        }
 
         private void button1_Click(object sender, EventArgs e)
         {
